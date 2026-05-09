@@ -9,6 +9,7 @@ defmodule PhoenixCap.MixProject do
       description: "A tiny Phoenix-native verifier for the Cap proof-of-work widget.",
       start_permanent: Mix.env() == :prod,
       package: package(),
+      dialyzer: dialyzer(),
       deps: deps()
     ]
   end
@@ -40,6 +41,12 @@ defmodule PhoenixCap.MixProject do
       ],
       licenses: ["MIT", "Apache-2.0"],
       links: %{}
+    ]
+  end
+
+  defp dialyzer do
+    [
+      plt_add_apps: [:mix]
     ]
   end
 end

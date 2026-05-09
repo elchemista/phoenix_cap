@@ -58,6 +58,33 @@ Then point the widget at your forwarded Phoenix route:
 When the widget is inside a form it injects a hidden `cap-token` input by
 default.
 
+PhoenixCap also vendors Cap's browser WASM package under `assets/wasm/`. If you
+want the widget to load the bundled WASM instead of jsDelivr, copy the WASM file
+into your Phoenix static assets and configure the URL before loading the widget:
+
+```html
+<script>
+  window.CAP_CUSTOM_WASM_URL = "/cap_wasm_bg.wasm";
+</script>
+```
+
+## Updating Cap Assets
+
+To update the bundled widget and WASM files to the latest npm releases:
+
+```bash
+mix phoenix_cap.update_assets
+```
+
+To pin exact versions:
+
+```bash
+mix phoenix_cap.update_assets --widget 0.1.50 --wasm 0.0.7
+```
+
+The task writes `assets/VERSIONS` so releases can show exactly which Cap assets
+are bundled.
+
 ## Config
 
 PhoenixCap keeps JSON and token signing in your app. Configure the JSON library
