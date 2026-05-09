@@ -66,7 +66,8 @@ you already use and a token module with the same API shape as `Phoenix.Token`:
 ```elixir
 config :phoenix_cap,
   json_library: Jason,
-  token_module: Phoenix.Token
+  token_module: Phoenix.Token,
+  token_salt: "phoenix-cap-token"
 ```
 
 For `PhoenixCap.verify(conn, token)`, PhoenixCap uses
@@ -80,6 +81,9 @@ the token context explicitly:
 config :phoenix_cap,
   token_context: MyAppWeb.Endpoint
 ```
+
+`token_salt` defaults to `"phoenix-cap-token"`. Changing it invalidates any
+Cap verification tokens that have already been issued but not yet verified.
 
 Custom token modules implement the same function shape:
 

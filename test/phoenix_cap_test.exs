@@ -15,18 +15,26 @@ end
 defmodule PhoenixCap.TestToken do
   @behaviour PhoenixCap.Token
 
-  def sign(_context, _salt, payload) do
-    "custom:" <> Base.url_encode64(:erlang.term_to_binary(payload), padding: false)
+  def sign(context, salt, payload) do
+    "custom:" <>
+      Base.url_encode64(:erlang.term_to_binary({context, salt, payload}), padding: false)
   end
 
-  def verify(_context, _salt, "custom:" <> encoded, _opts) do
+  def verify(context, salt, "custom:" <> encoded, _opts) do
     case Base.url_decode64(encoded, padding: false) do
-      {:ok, binary} -> {:ok, :erlang.binary_to_term(binary)}
+      {:ok, binary} -> verify_payload(binary, context, salt)
       :error -> {:error, :invalid}
     end
   end
 
   def verify(_context, _salt, _token, _opts), do: {:error, :invalid}
+
+  defp verify_payload(binary, context, salt) do
+    case :erlang.binary_to_term(binary) do
+      {^context, ^salt, payload} -> {:ok, payload}
+      _other -> {:error, :invalid}
+    end
+  end
 end
 
 defmodule PhoenixCapTest do
@@ -43,6 +51,7 @@ defmodule PhoenixCapTest do
     Application.put_env(:phoenix_cap, :json_library, JSON)
     Application.put_env(:phoenix_cap, :token_module, PhoenixCap.TestToken)
     Application.put_env(:phoenix_cap, :token_context, :test_context)
+    Application.delete_env(:phoenix_cap, :token_salt)
     ETS.reset()
     :ok
   end
@@ -256,6 +265,38 @@ defmodule PhoenixCapTest do
     assert PhoenixCap.verify(verify_token) == :ok
   end
 
+  test "custom token salt is passed to configured token module" do
+    Application.put_env(:phoenix_cap, :token_salt, "my-cap-token")
+    challenge = create_challenge()
+    solutions = solve(challenge)
+
+    redeem_conn =
+      :post
+      |> conn("/cap/redeem", JSON.encode!(%{token: challenge["token"], solutions: solutions}))
+      |> put_req_header("content-type", "application/json")
+      |> dispatch()
+
+    assert %{"success" => true, "token" => verify_token} = JSON.decode!(redeem_conn.resp_body)
+    assert PhoenixCap.verify(redeem_conn, verify_token) == :ok
+  end
+
+  test "changing token salt rejects previously issued tokens" do
+    challenge = create_challenge()
+    solutions = solve(challenge)
+
+    redeem_conn =
+      :post
+      |> conn("/cap/redeem", JSON.encode!(%{token: challenge["token"], solutions: solutions}))
+      |> put_req_header("content-type", "application/json")
+      |> dispatch()
+
+    assert %{"success" => true, "token" => verify_token} = JSON.decode!(redeem_conn.resp_body)
+
+    Application.put_env(:phoenix_cap, :token_salt, "rotated-cap-token")
+
+    assert PhoenixCap.verify(redeem_conn, verify_token) == {:error, :invalid}
+  end
+
   test "custom token module can be configured" do
     challenge = create_challenge()
     solutions = solve(challenge)
@@ -344,7 +385,7 @@ defmodule PhoenixCapTest do
            }) ==
              {:error, "Challenge invalid or expired"}
 
-    token = PhoenixCap.TestToken.sign(conn(:post, "/"), "phoenix-cap-token", %{nonce: "expired"})
+    token = PhoenixCap.TestToken.sign(:test_context, "phoenix-cap-token", %{nonce: "expired"})
     hash = :crypto.hash(:sha256, token) |> Base.encode16(case: :lower)
     ETS.put_token(hash, System.system_time(:millisecond) - 1)
 

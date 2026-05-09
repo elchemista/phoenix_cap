@@ -4,7 +4,7 @@ defmodule PhoenixCap.Verification do
   alias PhoenixCap.Store.ETS
 
   @token_ttl_seconds 20 * 60
-  @salt "phoenix-cap-token"
+  @default_token_salt "phoenix-cap-token"
 
   def issue(conn) do
     expires = now_ms() + @token_ttl_seconds * 1000
@@ -16,7 +16,7 @@ defmodule PhoenixCap.Verification do
 
     with {:ok, module} <- token_module(),
          {:ok, context} <- token_context(conn),
-         token when is_binary(token) <- module.sign(context, @salt, payload) do
+         token when is_binary(token) <- module.sign(context, token_salt(), payload) do
       :ok = ETS.put_token(hash(token), expires)
       {:ok, token, expires}
     else
@@ -30,7 +30,8 @@ defmodule PhoenixCap.Verification do
   def verify(conn, token) do
     with {:ok, module} <- token_module(),
          {:ok, context} <- token_context(conn),
-         {:ok, _payload} <- module.verify(context, @salt, token, max_age: @token_ttl_seconds),
+         {:ok, _payload} <-
+           module.verify(context, token_salt(), token, max_age: @token_ttl_seconds),
          {:ok, _expires} <- ETS.take_token(hash(token)) do
       :ok
     else
@@ -59,6 +60,10 @@ defmodule PhoenixCap.Verification do
       true ->
         {:ok, conn}
     end
+  end
+
+  defp token_salt do
+    Application.get_env(:phoenix_cap, :token_salt, @default_token_salt)
   end
 
   defp hash(token) do
