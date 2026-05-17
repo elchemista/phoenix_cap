@@ -35,7 +35,7 @@ by adding `phoenix_cap` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:phoenix_cap, "~> 0.1.0"}
+    {:phoenix_cap, github: "elchemista/phoenix_cap"}
   ]
 end
 ```
